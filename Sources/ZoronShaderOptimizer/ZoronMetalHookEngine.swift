@@ -41,11 +41,10 @@ public final class ZoronMetalHookEngine: NSObject {
 
         self.defaultDevice = device
 
-        // Compile custom optimized Metal kernels with fast-math enabled
         let compileOptions = MTLCompileOptions()
         compileOptions.fastMathEnabled = true
         if #available(iOS 16.0, *) {
-            compileOptions.mathMode = .fast
+            compileOptions.optimizationLevel = .performance
         }
 
         do {
