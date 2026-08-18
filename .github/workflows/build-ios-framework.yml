@@ -1,0 +1,89 @@
+name: Build Zoron Shader Optimizer Framework & Dylib
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Compile Swift Framework & Dylib for iOS (arm64)
+        run: |
+          mkdir -p build/ZoronShaderOptimizer.framework
+          mkdir -p build/dylib
+          
+          # Automatically find all Swift source files
+          SWIFT_FILES=$(find . -name "*.swift" ! -name "Package.swift")
+          echo "Found Swift files to compile:"
+          echo "$SWIFT_FILES"
+          
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          
+          # 1. Compile the C Constructor file
+          clang -c Sources/ZoronShaderOptimizer/ZoronEntry.c -target arm64-apple-ios15.0 -isysroot $SDK_PATH -o build/ZoronEntry.o
+
+          # 2. Compile iOS arm64 dynamic framework (Linking the C Constructor object file)
+          swiftc -target arm64-apple-ios15.0 \
+            -sdk $SDK_PATH \
+            -emit-library \
+            -emit-module \
+            -module-name ZoronShaderOptimizer \
+            -O \
+            $SWIFT_FILES \
+            build/ZoronEntry.o \
+            -o build/ZoronShaderOptimizer.framework/ZoronShaderOptimizer
+            
+          # Generate Info.plist for the framework
+          cat << 'EOF' > build/ZoronShaderOptimizer.framework/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleExecutable</key>
+              <string>ZoronShaderOptimizer</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.zoron.ZoronShaderOptimizer</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>ZoronShaderOptimizer</string>
+              <key>CFBundlePackageType</key>
+              <string>FMWK</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>MinimumOSVersion</key>
+              <string>15.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          # 3. Also output standalone .dylib
+          cp build/ZoronShaderOptimizer.framework/ZoronShaderOptimizer build/dylib/ZoronShaderOptimizer.dylib
+
+      - name: Package Artifacts
+        run: |
+          cd build
+          zip -r ZoronShaderOptimizer.framework.zip ZoronShaderOptimizer.framework
+          zip -r ZoronShaderOptimizer.dylib.zip dylib/ZoronShaderOptimizer.dylib
+
+      - name: Upload Framework Release (.zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZoronShaderOptimizer-iOS-Framework
+          path: build/ZoronShaderOptimizer.framework.zip
+
+      - name: Upload Standalone Dylib Release (.zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZoronShaderOptimizer-iOS-Dylib
+          path: build/ZoronShaderOptimizer.dylib.zip
