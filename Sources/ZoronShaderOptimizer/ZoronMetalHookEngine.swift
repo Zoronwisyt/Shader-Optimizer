@@ -43,9 +43,6 @@ public final class ZoronMetalHookEngine: NSObject {
 
         let compileOptions = MTLCompileOptions()
         compileOptions.fastMathEnabled = true
-        if #available(iOS 16.0, *) {
-            compileOptions.optimizationLevel = .performance
-        }
 
         do {
             self.customLibrary = try device.makeLibrary(source: ZoronShaderKernels.metalSourceCode, options: compileOptions)
